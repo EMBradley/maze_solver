@@ -94,35 +94,27 @@ class Maze:
         current_cell.visited = True
 
         while True:
-            possible_directions = []
-
-            if i + 1 < self.num_rows and not self.cells[i + 1][j].visited:
-                possible_directions.append((i + 1, j))
-            if j + 1 < self.num_cols and not self.cells[i][j + 1].visited:
-                possible_directions.append((i, j + 1))
-            if i > 0 and not self.cells[i - 1][j].visited:
-                possible_directions.append((i - 1, j))
-            if j > 0 and not self.cells[i][j - 1].visited:
-                possible_directions.append((i, j - 1))
+            possible_directions = self.__get_unvisited_neighbors(i, j)
 
             if not possible_directions:
                 return
 
-            (k, l) = random.choice(possible_directions)
+            (k, l, direction) = random.choice(possible_directions)
             next_cell = self.cells[k][l]
 
-            if k > i:
-                self.break_wall(current_cell, Direction.Down)
-                self.break_wall(next_cell, Direction.Up)
-            elif i > k:
-                self.break_wall(current_cell, Direction.Up)
-                self.break_wall(next_cell, Direction.Down)
-            elif l > j:
-                self.break_wall(current_cell, Direction.Right)
-                self.break_wall(next_cell, Direction.Left)
-            else:
-                self.break_wall(current_cell, Direction.Left)
-                self.break_wall(next_cell, Direction.Right)
+            match direction:
+                case Direction.Up:
+                    self.break_wall(current_cell, direction)
+                    self.break_wall(next_cell, Direction.Down)
+                case Direction.Down:
+                    self.break_wall(current_cell, direction)
+                    self.break_wall(next_cell, Direction.Up)
+                case Direction.Left:
+                    self.break_wall(current_cell, direction)
+                    self.break_wall(next_cell, Direction.Right)
+                case Direction.Right:
+                    self.break_wall(current_cell, direction)
+                    self.break_wall(next_cell, Direction.Left)
 
             self.__break_walls_recursive(k, l)
 
@@ -131,14 +123,82 @@ class Maze:
             for cell in row:
                 cell.visited = False
 
-    def solve(self) -> bool:
+    def __get_unvisited_neighbors(
+        self, i: int, j: int
+    ) -> list[tuple[int, int, Direction]]:
+        directions_to_check = [
+            (i + 1, j, Direction.Down),
+            (i, j + 1, Direction.Right),
+            (i - 1, j, Direction.Up),
+            (i, j - 1, Direction.Left),
+        ]
+
+        return [
+            (k, l, dir)
+            for (k, l, dir) in directions_to_check
+            if k in range(self.num_rows)
+            and l in range(self.num_cols)
+            and not self.cells[k][l].visited
+        ]
+
+    def __get_accessible_neighbors(self, i: int, j: int) -> list[tuple[int, int]]:
+        current_cell = self.cells[i][j]
+
+        unvisited_neighbors = self.__get_unvisited_neighbors(i, j)
+        accessible_neighbors = []
+
+        for k, l, direction in unvisited_neighbors:
+            if k not in range(self.num_rows) or l not in range(self.num_cols):
+                continue
+            if current_cell.walls[direction]:
+                continue
+            if self.cells[k][l].visited:
+                continue
+            accessible_neighbors.append((k, l))
+
+        return accessible_neighbors
+
+    def bfs(self) -> bool:
+        """
+        Solves the maze using breadth first search
+        and draws all attempted paths to the screen
+        """
+        start = self.cells[0][0]
+        paths = {start: [start]}
+        to_visit = [(0, 0)]
+
+        while to_visit:
+            i, j = to_visit.pop(0)
+            current_cell = self.cells[i][j]
+            current_cell.visited = True
+            current_path = paths[current_cell]
+
+            if len(current_path) > 1:
+                current_path[-2].draw_move(current_cell, undo=True)
+                self.__animate()
+
+            for k, l in self.__get_accessible_neighbors(i, j):
+                next_cell = self.cells[k][l]
+                if k + 1 == self.num_rows and l + 1 == self.num_cols:
+                    path_to_end = current_path + [next_cell]
+                    for a, b in zip(path_to_end[:-1], path_to_end[1:]):
+                        a.draw_move(b)
+                        self.__animate()
+                    return True
+                if next_cell not in to_visit and next_cell not in paths:
+                    to_visit.append((k, l))
+                    paths[next_cell] = current_path + [next_cell]
+
+        return False
+
+    def dfs(self) -> bool:
         """
         Solves the maze using recursive depth first search
         and draws all attempted paths to the screen
         """
-        return self.__solve_recursive(0, 0)
+        return self.__dfs_recursive(0, 0)
 
-    def __solve_recursive(self, i: int, j: int) -> bool:
+    def __dfs_recursive(self, i: int, j: int) -> bool:
         self.__animate()
 
         if i + 1 == self.num_rows and j + 1 == self.num_cols:
@@ -147,25 +207,12 @@ class Maze:
         current_cell = self.cells[i][j]
         current_cell.visited = True
 
-        directions_to_check = [
-            (i + 1, j, Direction.Down),
-            (i, j + 1, Direction.Right),
-            (i - 1, j, Direction.Up),
-            (i, j - 1, Direction.Left),
-        ]
+        accessible_neighbors = self.__get_accessible_neighbors(i, j)
 
-        for k, l, wall in directions_to_check:
-            if k not in range(self.num_rows) or l not in range(self.num_cols):
-                continue
-            if current_cell.walls[wall]:
-                continue
-
+        for k, l in accessible_neighbors:
             next_cell = self.cells[k][l]
-            if next_cell.visited:
-                continue
-
             current_cell.draw_move(next_cell)
-            if self.__solve_recursive(k, l):
+            if self.__dfs_recursive(k, l):
                 return True
             current_cell.draw_move(next_cell, undo=True)
 
