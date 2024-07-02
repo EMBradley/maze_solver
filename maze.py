@@ -43,6 +43,46 @@ class Maze:
         self.__break_walls_recursive(0, 0)
         self.__reset_cells_visited()
 
+    def solve(self) -> bool:
+        """
+        Solves the maze using recursive depth first search
+        and draws all attempted paths to the screen
+        """
+        return self.__solve_recursive(0, 0)
+
+    def __solve_recursive(self, i: int, j: int) -> bool:
+        self.__animate()
+
+        if i + 1 == self.num_cols and j + 1 == self.num_rows:
+            return True
+
+        current_cell = self.cells[i][j]
+        current_cell.visited = True
+
+        directions_to_check = [
+            (i + 1, j, "bottom"),
+            (i, j + 1, "right"),
+            (i - 1, j, "top"),
+            (i, j - 1, "left"),
+        ]
+
+        for k, l, wall in directions_to_check:
+            if k not in range(self.num_cols) or j not in range(self.num_rows):
+                continue
+            if current_cell.walls[wall]:
+                continue
+
+            next_cell = self.cells[k][l]
+            if next_cell.visited:
+                continue
+
+            current_cell.draw_move(next_cell)
+            if self.__solve_recursive(k, l):
+                return True
+            current_cell.draw_move(next_cell, undo=True)
+
+        return False
+
     def __create_cells(self) -> None:
         self.cells = []
 
@@ -71,7 +111,7 @@ class Maze:
     def __animate(self) -> None:
         assert self.__window is not None
         self.__window.redraw()
-        sleep(0.03)
+        sleep(0.005)
 
     def break_wall(self, cell: Cell, wall: str) -> None:
         """Removes the designated wall, then redraws the cell on screen"""
@@ -94,11 +134,14 @@ class Maze:
         while True:
             to_visit = []
 
-            for k, l in [(i + 1, j), (i - 1, j), (i, j + 1), (i, j - 1)]:
-                if k not in range(self.num_rows) or l not in range(self.num_cols):
-                    continue
-                if not self.cells[k][l].visited:
-                    to_visit.append((k, l))
+            if i + 1 < self.num_cols and not self.cells[i + 1][j].visited:
+                to_visit.append((i + 1, j))
+            if j + 1 < self.num_rows and not self.cells[i][j + 1].visited:
+                to_visit.append((i, j + 1))
+            if i > 0 and not self.cells[i - 1][j].visited:
+                to_visit.append((i - 1, j))
+            if j > 0 and not self.cells[i][j - 1].visited:
+                to_visit.append((i, j - 1))
 
             if not to_visit:
                 return
