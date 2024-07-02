@@ -66,4 +66,5 @@ class Window:
         line.draw(self.__canvas, fill_color)
 
     def clear(self):
+        """Clears contents of `self`"""
         self.__canvas.delete("all")
