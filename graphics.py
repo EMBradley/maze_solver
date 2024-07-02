@@ -64,3 +64,6 @@ class Window:
     def draw_line(self, line: Line, fill_color: str = "black"):
         """Draw a given line on the screen"""
         line.draw(self.__canvas, fill_color)
+
+    def clear(self):
+        self.__canvas.delete("all")
