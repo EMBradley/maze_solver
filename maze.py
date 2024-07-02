@@ -58,6 +58,7 @@ class Maze:
         self.__break_entrance_and_entrance()
         self.__break_walls()
         self.__reset_cells_visited()
+        self.__draw_cells()
 
     def __create_cells(self) -> None:
         self.cells = []
@@ -73,12 +74,11 @@ class Maze:
                 row.append(cell)
             self.cells.append(row)
 
-        if not self.__window:
-            return
-
+    def __draw_cells(self) -> None:
         for row in self.cells:
             for cell in row:
                 cell.draw()
+        self.__animate()
 
     def __animate(self) -> None:
         if not self.__window:
@@ -88,16 +88,12 @@ class Maze:
         if self.__animation_delay:
             sleep(self.__animation_delay / 1000)
 
-    def __break_wall(self, cell: Cell, wall: Direction) -> None:
-        cell.walls[wall] = False
-        cell.draw()
-
     def __break_entrance_and_entrance(self) -> None:
         entrance_cell = self.cells[0][0]
         exit_cell = self.cells[-1][-1]
 
-        self.__break_wall(entrance_cell, Direction.Up)
-        self.__break_wall(exit_cell, Direction.Down)
+        entrance_cell.walls[Direction.Up] = False
+        exit_cell.walls[Direction.Down] = False
 
     def __break_walls(self) -> None:
         start = self.cells[0][0]
@@ -114,9 +110,9 @@ class Maze:
                 previous_cell = current_path[-2][0]
                 direction_from_previous = current_path[-1][1]
 
-                self.__break_wall(previous_cell, direction_from_previous)
-                self.__break_wall(
-                    current_cell, __opposite_direction(direction_from_previous)
+                previous_cell.walls[direction_from_previous] = False
+                current_cell.walls[__opposite_direction(direction_from_previous)] = (
+                    False
                 )
 
                 current_cell.visited = True
