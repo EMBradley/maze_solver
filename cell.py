@@ -1,9 +1,12 @@
 # pylint: disable=too-many-arguments
 """Provides rectangular cells for drawing maze"""
 
+from enum import Enum
 from typing import Self
 
 from graphics import Line, Point, Window
+
+Direction = Enum("Direction", ["Up", "Down", "Left", "Right"])
 
 
 class Cell:
@@ -21,10 +24,10 @@ class Cell:
         window: Window | None = None,
     ) -> None:
         self.walls = {
-            "top": True,
-            "bottom": True,
-            "left": True,
-            "right": True,
+            Direction.Up: True,
+            Direction.Down: True,
+            Direction.Left: True,
+            Direction.Right: True,
         }
         self.__x1 = x1
         self.__y1 = y1
@@ -50,10 +53,10 @@ class Cell:
         right_wall = Line(Point(self.__x2, self.__y1), Point(self.__x2, self.__y2))
 
         for wall, name in [
-            (top_wall, "top"),
-            (bottom_wall, "bottom"),
-            (left_wall, "left"),
-            (right_wall, "right"),
+            (top_wall, Direction.Up),
+            (bottom_wall, Direction.Down),
+            (left_wall, Direction.Left),
+            (right_wall, Direction.Right),
         ]:
             if self.walls[name]:
                 fill_color = "black"
