@@ -1,6 +1,5 @@
-"""Maze Solver: Generates and solves a maze"""
-
-from gui import Maze, Window
+from graphics import Window
+from maze import Maze
 
 
 def main():
@@ -10,4 +9,5 @@ def main():
     window.wait_for_close()
 
 
-main()
+if __name__ == "__main__":
+    main()
