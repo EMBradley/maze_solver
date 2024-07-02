@@ -45,7 +45,8 @@ class Cell:
 
     def draw(self) -> None:
         """Draws the cell on the given canvas"""
-        assert self.__window is not None
+        if not self.__window:
+            return
 
         top_wall = Line(Point(self.__x1, self.__y1), Point(self.__x2, self.__y1))
         bottom_wall = Line(Point(self.__x1, self.__y2), Point(self.__x2, self.__y2))
@@ -68,7 +69,8 @@ class Cell:
         """
         Draws a line from the center of `self` to the center of `to_cell`
         """
-        assert self.__window is not None
+        if not self.__window:
+            return
 
         if undo:
             fill_color = "gray"

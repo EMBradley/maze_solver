@@ -71,7 +71,9 @@ class Maze:
         self.__animate()
 
     def __animate(self) -> None:
-        assert self.__window is not None
+        if not self.__window:
+            return
+
         self.__window.redraw()
         sleep(self.__animation_delay / 1000)
 
