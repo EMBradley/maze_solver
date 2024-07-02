@@ -2,6 +2,7 @@
 """Classes for creating and interacting with graphical interface"""
 
 from tkinter import Canvas, Tk
+from typing import Self
 
 
 class Point:
@@ -63,6 +64,13 @@ class Cell:
         self.__y2 = y2
         # self.__is_finish = is_finish
 
+    def get_center(self):
+        """
+        Returns the point in the center of a cell,
+        rounding up and to the left
+        """
+        return Point((self.__x1 + self.__x2) // 2, (self.__y1 + self.__y2) // 2)
+
     def draw(self, canvas: Canvas, fill_color: str = "black"):
         """Draws the cell on the given canvas"""
         if self.walls["top"]:
@@ -77,6 +85,18 @@ class Cell:
         if self.walls["right"]:
             right_wall = Line(Point(self.__x2, self.__y1), Point(self.__x2, self.__y2))
             right_wall.draw(canvas, fill_color)
+
+    def draw_move(self, to_cell: Self, canvas: Canvas, undo=False):
+        """
+        Draws a line from the center of `self` to the center of `to_cell`
+        """
+        if undo:
+            fill_color = "gray"
+        else:
+            fill_color = "red"
+        start = self.get_center()
+        end = to_cell.get_center()
+        Line(start, end).draw(canvas, fill_color)
 
 
 class Window:
@@ -111,3 +131,7 @@ class Window:
     def draw_cell(self, cell: Cell, fill_color: str = "black"):
         """Draw a given cell on the screen"""
         cell.draw(self.__canvas, fill_color)
+
+    def draw_move(self, first_cell: Cell, second_cell: Cell, undo=False):
+        """Draw a line between the centers of the given cells"""
+        first_cell.draw_move(second_cell, self.__canvas, undo)
