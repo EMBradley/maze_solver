@@ -31,15 +31,16 @@ class Cell:
         self.__x2 = x2
         self.__y2 = y2
         self.__window = window
+        self.visited = False
 
-    def get_center(self):
+    def get_center(self) -> Point:
         """
         Returns the point in the center of a cell,
         rounding up and to the left
         """
         return Point((self.__x1 + self.__x2) // 2, (self.__y1 + self.__y2) // 2)
 
-    def draw(self):
+    def draw(self) -> None:
         """Draws the cell on the given canvas"""
         assert self.__window is not None
 
@@ -60,7 +61,7 @@ class Cell:
                 fill_color = "#d9d9d9"
             self.__window.draw_line(wall, fill_color)
 
-    def draw_move(self, to_cell: Self, undo=False):
+    def draw_move(self, to_cell: Self, undo=False) -> None:
         """
         Draws a line from the center of `self` to the center of `to_cell`
         """
