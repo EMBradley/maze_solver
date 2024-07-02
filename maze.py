@@ -7,7 +7,8 @@ from cell import Cell, Direction
 from graphics import Window
 
 
-def __opposite_direction(direction: Direction) -> Direction:
+def opposite_direction(direction: Direction) -> Direction:
+    """Returns the direction opposite the one given"""
     match direction:
         case Direction.Up:
             return Direction.Down
@@ -34,7 +35,7 @@ class Maze:
         cell_size_y: int,
         window: Window | None = None,
         seed: float | None = None,
-        animation_delay_ms: int = 0,
+        animation_delay: float = 0.0,
     ) -> None:
         assert x >= 0
         assert y >= 0
@@ -53,9 +54,9 @@ class Maze:
         self.__cell_size_x = cell_size_x
         self.__cell_size_y = cell_size_y
         self.__window = window
-        self.__animation_delay = animation_delay_ms
+        self.__animation_delay = animation_delay
         self.__create_cells()
-        self.__break_entrance_and_entrance()
+        self.__break_entrance_and_exit()
         self.__break_walls()
         self.__reset_cells_visited()
         self.__draw_cells()
@@ -86,9 +87,9 @@ class Maze:
 
         self.__window.redraw()
         if self.__animation_delay:
-            sleep(self.__animation_delay / 1000)
+            sleep(self.__animation_delay)
 
-    def __break_entrance_and_entrance(self) -> None:
+    def __break_entrance_and_exit(self) -> None:
         entrance_cell = self.cells[0][0]
         exit_cell = self.cells[-1][-1]
 
@@ -111,9 +112,7 @@ class Maze:
                 direction_from_previous = current_path[-1][1]
 
                 previous_cell.walls[direction_from_previous] = False
-                current_cell.walls[__opposite_direction(direction_from_previous)] = (
-                    False
-                )
+                current_cell.walls[opposite_direction(direction_from_previous)] = False
 
                 current_cell.visited = True
 
