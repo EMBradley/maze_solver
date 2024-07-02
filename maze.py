@@ -7,6 +7,20 @@ from cell import Cell, Direction
 from graphics import Window
 
 
+def __opposite_direction(direction: Direction) -> Direction:
+    match direction:
+        case Direction.Up:
+            return Direction.Down
+        case Direction.Down:
+            return Direction.Up
+        case Direction.Left:
+            return Direction.Right
+        case Direction.Right:
+            return Direction.Left
+        case _:
+            raise ValueError
+
+
 class Maze:
     """Defines the entire maze"""
 
@@ -19,7 +33,7 @@ class Maze:
         cell_size_x: int,
         cell_size_y: int,
         window: Window | None = None,
-        seed: int | None = None,
+        seed: float | None = None,
         animation_delay_ms: int = 0,
     ) -> None:
         assert x >= 0
@@ -42,7 +56,7 @@ class Maze:
         self.__animation_delay = animation_delay_ms
         self.__create_cells()
         self.__break_entrance_and_entrance()
-        self.__break_walls_recursive(0, 0)
+        self.__break_walls()
         self.__reset_cells_visited()
 
     def __create_cells(self) -> None:
@@ -66,59 +80,53 @@ class Maze:
             for cell in row:
                 cell.draw()
 
-    def __draw_cell(self, cell: Cell) -> None:
-        cell.draw()
-        self.__animate()
-
     def __animate(self) -> None:
         if not self.__window:
             return
 
         self.__window.redraw()
-        sleep(self.__animation_delay / 1000)
+        if self.__animation_delay:
+            sleep(self.__animation_delay / 1000)
 
-    def break_wall(self, cell: Cell, wall: Direction) -> None:
-        """Removes the designated wall, then redraws the cell on screen"""
+    def __break_wall(self, cell: Cell, wall: Direction) -> None:
         cell.walls[wall] = False
-
-        if self.__window:
-            self.__draw_cell(cell)
+        cell.draw()
 
     def __break_entrance_and_entrance(self) -> None:
         entrance_cell = self.cells[0][0]
         exit_cell = self.cells[-1][-1]
 
-        self.break_wall(entrance_cell, Direction.Up)
-        self.break_wall(exit_cell, Direction.Down)
+        self.__break_wall(entrance_cell, Direction.Up)
+        self.__break_wall(exit_cell, Direction.Down)
 
-    def __break_walls_recursive(self, i: int, j: int) -> None:
-        current_cell = self.cells[i][j]
-        current_cell.visited = True
+    def __break_walls(self) -> None:
+        start = self.cells[0][0]
+        start.visited = True
+        stack = [(0, 0)]
+        paths = {start: [(start, Direction.Down)]}
 
-        while True:
-            possible_directions = self.__get_unvisited_neighbors(i, j)
+        while stack:
+            i, j = stack.pop()
+            current_cell = self.cells[i][j]
+            current_path = paths[current_cell]
 
-            if not possible_directions:
-                return
+            if not current_cell.visited and len(current_path) > 1:
+                previous_cell = current_path[-2][0]
+                direction_from_previous = current_path[-1][1]
 
-            (k, l, direction) = random.choice(possible_directions)
-            next_cell = self.cells[k][l]
+                self.__break_wall(previous_cell, direction_from_previous)
+                self.__break_wall(
+                    current_cell, __opposite_direction(direction_from_previous)
+                )
 
-            match direction:
-                case Direction.Up:
-                    self.break_wall(current_cell, direction)
-                    self.break_wall(next_cell, Direction.Down)
-                case Direction.Down:
-                    self.break_wall(current_cell, direction)
-                    self.break_wall(next_cell, Direction.Up)
-                case Direction.Left:
-                    self.break_wall(current_cell, direction)
-                    self.break_wall(next_cell, Direction.Right)
-                case Direction.Right:
-                    self.break_wall(current_cell, direction)
-                    self.break_wall(next_cell, Direction.Left)
+                current_cell.visited = True
 
-            self.__break_walls_recursive(k, l)
+            univisited_neighbors = self.__get_unvisited_neighbors(i, j)
+            random.shuffle(univisited_neighbors)
+            for k, l, direction in univisited_neighbors:
+                neighbor = self.cells[k][l]
+                paths[neighbor] = current_path + [(neighbor, direction)]
+                stack.append((k, l))
 
     def __reset_cells_visited(self):
         for row in self.cells:
@@ -135,13 +143,18 @@ class Maze:
             (i, j - 1, Direction.Left),
         ]
 
-        return [
-            (k, l, dir)
-            for (k, l, dir) in directions_to_check
-            if k in range(self.num_rows)
-            and l in range(self.num_cols)
-            and not self.cells[k][l].visited
-        ]
+        unvisited_neighbors = []
+
+        for k, l, direction in directions_to_check:
+            if k not in range(self.num_rows):
+                continue
+            if l not in range(self.num_cols):
+                continue
+            if self.cells[k][l].visited:
+                continue
+            unvisited_neighbors.append((k, l, direction))
+
+        return unvisited_neighbors
 
     def __get_accessible_neighbors(self, i: int, j: int) -> list[tuple[int, int]]:
         current_cell = self.cells[i][j]
@@ -150,8 +163,6 @@ class Maze:
         accessible_neighbors = []
 
         for k, l, direction in unvisited_neighbors:
-            if k not in range(self.num_rows) or l not in range(self.num_cols):
-                continue
             if current_cell.walls[direction]:
                 continue
             if self.cells[k][l].visited:
@@ -175,6 +186,7 @@ class Maze:
             current_cell.visited = True
             current_path = paths[current_cell]
 
+            # Draw the last step of the current_path
             if len(current_path) > 1:
                 current_path[-2].draw_move(current_cell, undo=True)
                 self.__animate()
@@ -182,10 +194,14 @@ class Maze:
             for k, l in self.__get_accessible_neighbors(i, j):
                 next_cell = self.cells[k][l]
                 if k + 1 == self.num_rows and l + 1 == self.num_cols:
+                    current_cell.draw_move(self.cells[-1][-1], undo=True)
                     path_to_end = current_path + [next_cell]
+
+                    # Redraw the whole correct path in red
                     for a, b in zip(path_to_end[:-1], path_to_end[1:]):
                         a.draw_move(b)
                         self.__animate()
+
                     return True
                 if next_cell not in to_visit and next_cell not in paths:
                     to_visit.append((k, l))
