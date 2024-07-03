@@ -48,22 +48,33 @@ class Cell:
         if not self.__window:
             return
 
-        top_wall = Line(Point(self.__x1, self.__y1), Point(self.__x2, self.__y1))
-        bottom_wall = Line(Point(self.__x1, self.__y2), Point(self.__x2, self.__y2))
-        left_wall = Line(Point(self.__x1, self.__y1), Point(self.__x1, self.__y2))
-        right_wall = Line(Point(self.__x2, self.__y1), Point(self.__x2, self.__y2))
+        top_wall = (
+            Line(Point(self.__x1 - 1, self.__y1), Point(self.__x2 + 1, self.__y1)),
+            Direction.Up,
+        )
+        bottom_wall = (
+            Line(Point(self.__x1 - 1, self.__y2), Point(self.__x2 + 1, self.__y2)),
+            Direction.Down,
+        )
+        left_wall = (
+            Line(Point(self.__x1, self.__y1 - 1), Point(self.__x1, self.__y2 + 1)),
+            Direction.Left,
+        )
+        right_wall = (
+            Line(Point(self.__x2, self.__y1 - 1), Point(self.__x2, self.__y2 + 1)),
+            Direction.Right,
+        )
 
-        for wall, name in [
-            (top_wall, Direction.Up),
-            (bottom_wall, Direction.Down),
-            (left_wall, Direction.Left),
-            (right_wall, Direction.Right),
-        ]:
-            if self.walls[name]:
-                fill_color = "black"
-            else:
-                fill_color = "#d9d9d9"
-            self.__window.draw_line(wall, fill_color)
+        walls = [top_wall, bottom_wall, left_wall, right_wall]
+        broken_walls = [
+            wall for (wall, direction) in walls if not self.walls[direction]
+        ]
+        intact_walls = [wall for (wall, direction) in walls if self.walls[direction]]
+
+        for wall in broken_walls:
+            self.__window.draw_line(wall, "#d9d9d9")
+        for wall in intact_walls:
+            self.__window.draw_line(wall, "black")
 
     def draw_move(self, to_cell: Self, undo=False) -> None:
         """
