@@ -61,6 +61,41 @@ class Maze:
         self.__reset_cells_visited()
         self.__draw_cells()
 
+    def __animate(self) -> None:
+        if not self.__window:
+            return
+
+        self.__window.redraw()
+        if self.__animation_delay:
+            sleep(self.__animation_delay)
+
+    def __draw_cells(self) -> None:
+        for row in self.cells:
+            for cell in row:
+                cell.draw()
+        self.__animate()
+
+    def __draw_path(self, path: list[Cell], undo: bool = False) -> None:
+        for i in range(len(path) - 1):
+            path[i].draw_move(path[i + 1], undo)
+
+    def __undo_path(
+        self,
+        paths: dict[Cell, list[Cell]],
+        current_cell: Cell,
+        stack: list[tuple[int, int]],
+    ) -> None:
+        if not stack:
+            return
+
+        current_path = paths[current_cell]
+        m, n = stack[-1]
+        next_cell = self.cells[m][n]
+        next_path = paths[next_cell]
+        branch_cell = next_path[-2]
+        branch_index = current_path.index(branch_cell)
+        self.__draw_path(current_path[branch_index:], undo=True)
+
     def __create_cells(self) -> None:
         self.cells = []
 
@@ -74,20 +109,6 @@ class Maze:
                 cell = Cell(x1, y1, x2, y2, self.__window)
                 row.append(cell)
             self.cells.append(row)
-
-    def __draw_cells(self) -> None:
-        for row in self.cells:
-            for cell in row:
-                cell.draw()
-        self.__animate()
-
-    def __animate(self) -> None:
-        if not self.__window:
-            return
-
-        self.__window.redraw()
-        if self.__animation_delay:
-            sleep(self.__animation_delay)
 
     def __break_entrance_and_exit(self) -> None:
         entrance_cell = self.cells[0][0]
@@ -172,6 +193,7 @@ class Maze:
         and draws all attempted paths to the screen
         """
         start = self.cells[0][0]
+        end = self.cells[-1][-1]
         paths = {start: [start]}
         to_visit = [(0, 0)]
 
@@ -183,20 +205,17 @@ class Maze:
 
             # Draw the last step of the current_path
             if len(current_path) > 1:
-                current_path[-2].draw_move(current_cell, undo=True)
+                previous_cell = current_path[-2]
+                previous_cell.draw_move(current_cell, undo=True)
                 self.__animate()
 
             for k, l in self.__get_accessible_neighbors(i, j):
                 next_cell = self.cells[k][l]
-                if k + 1 == self.num_rows and l + 1 == self.num_cols:
-                    current_cell.draw_move(self.cells[-1][-1], undo=True)
+                if next_cell == end:
+                    current_cell.draw_move(end, undo=True)
                     path_to_end = current_path + [next_cell]
-
-                    # Redraw the whole correct path in red
-                    for a, b in zip(path_to_end[:-1], path_to_end[1:]):
-                        a.draw_move(b)
-                        self.__animate()
-
+                    self.__draw_path(path_to_end)
+                    self.__animate()
                     return True
                 if next_cell not in to_visit and next_cell not in paths:
                     to_visit.append((k, l))
@@ -209,24 +228,34 @@ class Maze:
         Solves the maze using recursive depth first search
         and draws all attempted paths to the screen
         """
-        return self.__dfs_recursive(0, 0)
+        start = self.cells[0][0]
+        stack = [(0, 0)]
+        paths = {start: [start]}
 
-    def __dfs_recursive(self, i: int, j: int) -> bool:
-        self.__animate()
+        while stack:
+            self.__animate()
+            i, j = stack.pop()
+            current_cell = self.cells[i][j]
+            current_path = paths[current_cell]
 
-        if i + 1 == self.num_rows and j + 1 == self.num_cols:
-            return True
+            if len(current_path) > 1:
+                previous_cell = current_path[-2]
+                previous_cell.draw_move(current_cell)
 
-        current_cell = self.cells[i][j]
-        current_cell.visited = True
+            if not current_cell.visited:
+                if current_cell == self.cells[-1][-1]:
+                    return True
+                current_cell.visited = True
 
-        accessible_neighbors = self.__get_accessible_neighbors(i, j)
+            accessible_neighbors = self.__get_accessible_neighbors(i, j)
 
-        for k, l in accessible_neighbors:
-            next_cell = self.cells[k][l]
-            current_cell.draw_move(next_cell)
-            if self.__dfs_recursive(k, l):
-                return True
-            current_cell.draw_move(next_cell, undo=True)
+            if not accessible_neighbors:
+                self.__undo_path(paths, current_cell, stack)
+                self.__animate()
+
+            for k, l in reversed(self.__get_accessible_neighbors(i, j)):
+                neighbor = self.cells[k][l]
+                paths[neighbor] = current_path + [neighbor]
+                stack.append((k, l))
 
         return False
