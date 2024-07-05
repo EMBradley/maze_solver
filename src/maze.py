@@ -19,8 +19,6 @@ def opposite_direction(direction: Direction) -> Direction:
             return Direction.Right
         case Direction.Right:
             return Direction.Left
-        case _:
-            raise ValueError
 
 
 class Heap:
@@ -145,19 +143,16 @@ class Maze:
         start = self.__start()
         start.visited = True
         stack = [(0, 0)]
-        paths = {start: [(start, Direction.Down)]}
+        came_from = {}
 
         while stack:
             i, j = stack.pop()
             current_cell = self.cells[i][j]
-            current_path = paths[current_cell]
 
-            if not current_cell.visited and len(current_path) > 1:
-                previous_cell = current_path[-2][0]
-                direction_from_previous = current_path[-1][1]
-
-                previous_cell.walls[direction_from_previous] = False
-                current_cell.walls[opposite_direction(direction_from_previous)] = False
+            if not current_cell.visited and current_cell in came_from:
+                parent, direction = came_from[current_cell]
+                parent.walls[direction] = False
+                current_cell.walls[opposite_direction(direction)] = False
 
                 current_cell.visited = True
 
@@ -165,57 +160,64 @@ class Maze:
             random.shuffle(univisited_neighbors)
             for k, l, direction in univisited_neighbors:
                 neighbor = self.cells[k][l]
-                paths[neighbor] = current_path + [(neighbor, direction)]
+                came_from[neighbor] = (current_cell, direction)
                 stack.append((k, l))
 
     def reset(self):
         """Resets the state of the maze"""
-        for row in self.cells:
-            for cell in row:
-                cell.visited = False
-                cell.parent = None
-                cell.g_score = float("inf")
-                cell.f_score = float("inf")
+
+        def reset_cell(cell: Cell):
+            cell.visited = False
+            cell.parent = None
+            cell.g_score = float("inf")
+            cell.f_score = float("inf")
+
+        _ = [reset_cell(cell) for row in self.cells for cell in row]
+
         if self.__window:
             self.__window.clear()
             self.__draw_cells()
 
+    def __get_neighbor(self, i: int, j: int, direction: Direction):
+        match direction:
+            case Direction.Down:
+                return (i + 1, j, direction)
+            case Direction.Up:
+                return (i - 1, j, direction)
+            case Direction.Right:
+                return (i, j + 1, direction)
+            case Direction.Left:
+                return (i, j - 1, direction)
+
     def __get_unvisited_neighbors(
         self, i: int, j: int
     ) -> list[tuple[int, int, Direction]]:
-        directions_to_check = [
-            (i + 1, j, Direction.Down),
-            (i, j + 1, Direction.Right),
-            (i - 1, j, Direction.Up),
-            (i, j - 1, Direction.Left),
+        directions = [
+            Direction.Down,
+            Direction.Right,
+            Direction.Up,
+            Direction.Left,
         ]
 
-        unvisited_neighbors = []
+        neighbors = [self.__get_neighbor(i, j, direction) for direction in directions]
 
-        for k, l, direction in directions_to_check:
-            if k not in range(self.num_rows):
-                continue
-            if l not in range(self.num_cols):
-                continue
-            if self.cells[k][l].visited:
-                continue
-            unvisited_neighbors.append((k, l, direction))
+        unvisited_neighbors = [
+            (k, l, direction)
+            for (k, l, direction) in neighbors
+            if k in range(self.num_rows)
+            and l in range(self.num_cols)
+            and not self.cells[k][l].visited
+        ]
 
         return unvisited_neighbors
 
     def __get_accessible_neighbors(self, i: int, j: int) -> list[tuple[int, int]]:
         current_cell = self.cells[i][j]
-
-        unvisited_neighbors = self.__get_unvisited_neighbors(i, j)
-        accessible_neighbors = []
-
-        for k, l, direction in unvisited_neighbors:
-            if current_cell.walls[direction]:
-                continue
-            if self.cells[k][l].visited:
-                continue
-            accessible_neighbors.append((k, l))
-
+        accessible_neighbors = [
+            (k, l)
+            for (k, l, direction) in self.__get_unvisited_neighbors(i, j)
+            if not current_cell.walls[direction] and not self.cells[k][l].visited
+        ]
         return accessible_neighbors
 
     def bfs(self) -> bool:
@@ -231,6 +233,10 @@ class Maze:
             i, j = queue.pop(0)
             current_cell = self.cells[i][j]
 
+            if current_cell == self.__end():
+                self.__draw_end_to_start()
+                return True
+
             if current_cell.visited:
                 continue
 
@@ -244,9 +250,6 @@ class Maze:
                 next_cell = self.cells[k][l]
                 next_cell.parent = current_cell
                 next_cell.g_score = current_cell.g_score + 1
-                if next_cell == self.__end():
-                    self.__draw_end_to_start()
-                    return True
                 queue.append((k, l))
 
         return False
@@ -299,7 +302,8 @@ class Maze:
             next_cell = self.cells[k][l]
             next_cell.parent = current_cell
             current_cell.draw_move(next_cell, undo=True)
-            self.__animate(factor=0.1)
+            if self.__animation_delay:
+                self.__animate(factor=0.25)
             current_cell.visited = True
             current_cell = next_cell
             g += 1
