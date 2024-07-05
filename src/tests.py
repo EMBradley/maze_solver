@@ -30,6 +30,10 @@ class Tests(unittest.TestCase):
             num_cols = randint(10, 50)
             maze = Maze(0, 0, num_rows, num_cols, 10, 10)
             self.assertTrue(maze.dfs())
+            maze.reset()
+            self.assertTrue(maze.bfs())
+            maze.reset()
+            self.assertTrue(maze.a_star())
 
 
 if __name__ == "__main__":

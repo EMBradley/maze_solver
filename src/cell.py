@@ -1,4 +1,4 @@
-# pylint: disable=too-many-arguments
+# pylint: disable=[too-many-arguments, too-many-instance-attributes]
 """Provides rectangular cells for drawing maze"""
 
 from enum import Enum
@@ -35,6 +35,10 @@ class Cell:
         self.__y2 = y2
         self.__window = window
         self.visited = False
+        self.g_score = float("inf")
+        self.h_score = 0.0
+        self.f_score = float("inf")
+        self.parent: Cell | None = None
 
     def get_center(self) -> Point:
         """

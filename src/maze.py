@@ -1,5 +1,6 @@
 # pylint: disable=[too-few-public-methods, too-many-arguments, too-many-instance-attributes]
 """Provides class for creating and draw maze"""
+import heapq
 import random
 from time import sleep
 
@@ -22,6 +23,28 @@ def opposite_direction(direction: Direction) -> Direction:
             raise ValueError
 
 
+class Heap:
+    """
+    Convenience class for simplifying heapq usage
+    """
+
+    def __init__(self, array=None, heapify=True):
+        if array:
+            self.heap = array
+            if heapify:
+                heapq.heapify(self.heap)
+        else:
+            self.heap = []
+
+    def push(self, x):
+        """Push item to heap"""
+        heapq.heappush(self.heap, x)
+
+    def pop(self):
+        """Remove highest priority element from heap"""
+        return heapq.heappop(self.heap)
+
+
 class Maze:
     """Defines the entire maze"""
 
@@ -35,7 +58,7 @@ class Maze:
         cell_size_y: int,
         window: Window | None = None,
         seed: float | None = None,
-        animation_delay: float = 0.0,
+        animation_delay: float | None = None,
     ) -> None:
         assert x >= 0
         assert y >= 0
@@ -58,57 +81,58 @@ class Maze:
         self.__create_cells()
         self.__break_entrance_and_exit()
         self.__break_walls()
-        self.__reset_cells_visited()
+        self.reset()
         self.__draw_cells()
 
-    def __animate(self) -> None:
+    def __start(self) -> Cell:
+        return self.cells[0][0]
+
+    def __end(self) -> Cell:
+        return self.cells[-1][-1]
+
+    def __animate(self, factor: float = 1.0) -> None:
         if not self.__window:
             return
 
         self.__window.redraw()
-        if self.__animation_delay:
-            sleep(self.__animation_delay)
+        if self.__animation_delay and factor:
+            sleep(self.__animation_delay * factor)
 
     def __draw_cells(self) -> None:
-        for row in self.cells:
-            for cell in row:
-                cell.draw()
+        _ = [cell.draw() for row in self.cells for cell in row]
         self.__animate()
-
-    def __draw_path(self, path: list[Cell], undo: bool = False) -> None:
-        for i in range(len(path) - 1):
-            path[i].draw_move(path[i + 1], undo)
 
     def __undo_path(
         self,
-        paths: dict[Cell, list[Cell]],
         current_cell: Cell,
         stack: list[tuple[int, int]],
     ) -> None:
         if not stack:
             return
 
-        current_path = paths[current_cell]
         m, n = stack[-1]
         next_cell = self.cells[m][n]
-        next_path = paths[next_cell]
-        branch_cell = next_path[-2]
-        branch_index = current_path.index(branch_cell)
-        self.__draw_path(current_path[branch_index:], undo=True)
+        branch_cell = next_cell.parent
+
+        draw_cell = current_cell
+        while draw_cell != branch_cell and draw_cell.parent:
+            draw_cell.draw_move(draw_cell.parent, undo=True)
+            draw_cell = draw_cell.parent
 
     def __create_cells(self) -> None:
-        self.cells = []
+        def create_cell(i: int, j: int) -> Cell:
+            x1 = self.__x + self.__cell_size_x * j
+            y1 = self.__y + self.__cell_size_y * i
+            x2 = x1 + self.__cell_size_x
+            y2 = y1 + self.__cell_size_y
+            cell = Cell(x1, y1, x2, y2, self.__window)
+            cell.h_score = self.num_cols - i + self.num_rows - j
+            return cell
 
-        for i in range(self.num_rows):
-            row = []
-            for j in range(self.num_cols):
-                x1 = self.__x + self.__cell_size_x * j
-                y1 = self.__y + self.__cell_size_y * i
-                x2 = x1 + self.__cell_size_x
-                y2 = y1 + self.__cell_size_y
-                cell = Cell(x1, y1, x2, y2, self.__window)
-                row.append(cell)
-            self.cells.append(row)
+        self.cells = [
+            [create_cell(i, j) for j in range(self.num_cols)]
+            for i in range(self.num_rows)
+        ]
 
     def __break_entrance_and_exit(self) -> None:
         entrance_cell = self.cells[0][0]
@@ -118,7 +142,7 @@ class Maze:
         exit_cell.walls[Direction.Down] = False
 
     def __break_walls(self) -> None:
-        start = self.cells[0][0]
+        start = self.__start()
         start.visited = True
         stack = [(0, 0)]
         paths = {start: [(start, Direction.Down)]}
@@ -144,10 +168,17 @@ class Maze:
                 paths[neighbor] = current_path + [(neighbor, direction)]
                 stack.append((k, l))
 
-    def __reset_cells_visited(self):
+    def reset(self):
+        """Resets the state of the maze"""
         for row in self.cells:
             for cell in row:
                 cell.visited = False
+                cell.parent = None
+                cell.g_score = float("inf")
+                cell.f_score = float("inf")
+        if self.__window:
+            self.__window.clear()
+            self.__draw_cells()
 
     def __get_unvisited_neighbors(
         self, i: int, j: int
@@ -192,34 +223,31 @@ class Maze:
         Solves the maze using breadth first search
         and draws all attempted paths to the screen
         """
-        start = self.cells[0][0]
-        end = self.cells[-1][-1]
-        paths = {start: [start]}
-        to_visit = [(0, 0)]
+        current_cell = self.__start()
+        queue = [(0, 0)]
+        self.cells[0][0].g_score = 0
 
-        while to_visit:
-            i, j = to_visit.pop(0)
+        while queue:
+            i, j = queue.pop(0)
             current_cell = self.cells[i][j]
-            current_cell.visited = True
-            current_path = paths[current_cell]
 
-            # Draw the last step of the current_path
-            if len(current_path) > 1:
-                previous_cell = current_path[-2]
-                previous_cell.draw_move(current_cell, undo=True)
-                self.__animate()
+            if current_cell.visited:
+                continue
+
+            current_cell.visited = True
+
+            if current_cell.parent:
+                current_cell.parent.draw_move(current_cell, undo=True)
+                self.__animate(factor=1 / (len(queue) + 1))
 
             for k, l in self.__get_accessible_neighbors(i, j):
                 next_cell = self.cells[k][l]
-                if next_cell == end:
-                    current_cell.draw_move(end, undo=True)
-                    path_to_end = current_path + [next_cell]
-                    self.__draw_path(path_to_end)
-                    self.__animate()
+                next_cell.parent = current_cell
+                next_cell.g_score = current_cell.g_score + 1
+                if next_cell == self.__end():
+                    self.__draw_end_to_start()
                     return True
-                if next_cell not in to_visit and next_cell not in paths:
-                    to_visit.append((k, l))
-                    paths[next_cell] = current_path + [next_cell]
+                queue.append((k, l))
 
         return False
 
@@ -228,34 +256,108 @@ class Maze:
         Solves the maze using recursive depth first search
         and draws all attempted paths to the screen
         """
-        start = self.cells[0][0]
         stack = [(0, 0)]
-        paths = {start: [start]}
 
         while stack:
-            self.__animate()
             i, j = stack.pop()
             current_cell = self.cells[i][j]
-            current_path = paths[current_cell]
 
-            if len(current_path) > 1:
-                previous_cell = current_path[-2]
-                previous_cell.draw_move(current_cell)
+            if current_cell.parent:
+                current_cell.draw_move(current_cell.parent)
+                self.__animate()
 
             if not current_cell.visited:
-                if current_cell == self.cells[-1][-1]:
+                if current_cell == self.__end():
                     return True
                 current_cell.visited = True
 
             accessible_neighbors = self.__get_accessible_neighbors(i, j)
 
             if not accessible_neighbors:
-                self.__undo_path(paths, current_cell, stack)
+                self.__undo_path(current_cell, stack)
                 self.__animate()
 
             for k, l in reversed(self.__get_accessible_neighbors(i, j)):
                 neighbor = self.cells[k][l]
-                paths[neighbor] = current_path + [neighbor]
+                neighbor.parent = current_cell
                 stack.append((k, l))
+
+        return False
+
+    def __find_next_branch(self, i: int, j: int, g: float) -> tuple[int, int, float]:
+        k, l = i, j
+        start_cell = self.cells[k][l]
+        if start_cell == self.__end():
+            return k, l, g
+
+        current_cell = start_cell
+        if current_cell.parent:
+            current_cell.draw_move(current_cell.parent, undo=True)
+
+        while len(self.__get_accessible_neighbors(k, l)) == 1:
+            k, l = self.__get_accessible_neighbors(k, l)[0]
+            next_cell = self.cells[k][l]
+            next_cell.parent = current_cell
+            current_cell.draw_move(next_cell, undo=True)
+            self.__animate(factor=0.1)
+            current_cell.visited = True
+            current_cell = next_cell
+            g += 1
+
+            if next_cell == self.__end():
+                return k, l, g
+
+        return k, l, g
+
+    def __draw_end_to_start(self):
+        current_cell = self.cells[-1][-1]
+        path_length = current_cell.g_score
+
+        if path_length > 1000 or not self.__animation_delay:
+            factor = 0
+        else:
+            factor = 1 / (path_length * self.__animation_delay)
+
+        while current_cell.parent:
+            current_cell.draw_move(current_cell.parent)
+            current_cell = current_cell.parent
+            self.__animate(factor)
+
+    def a_star(self) -> bool:
+        """
+        Solves the maze using A* search and draws all attempted paths
+        """
+        start = self.__start()
+        start.g_score = 1.0
+        start.f_score = start.g_score + start.h_score
+        heap = Heap(array=[(start.f_score, 0, 0)])
+
+        while len(heap.heap):
+            _, i, j = heap.pop()
+            current_cell = self.cells[i][j]
+            if current_cell.visited:
+                continue
+            if current_cell.parent:
+                current_cell.draw_move(current_cell.parent, undo=True)
+            current_cell.visited = True
+
+            for k, l in self.__get_accessible_neighbors(i, j):
+                self.cells[k][l].parent = current_cell
+                g_new = current_cell.g_score + 1.0
+                (k, l, g_new) = self.__find_next_branch(k, l, g_new)
+                next_cell = self.cells[k][l]
+
+                if next_cell == self.__end():
+                    self.cells[k][l].g_score = g_new
+                    self.__draw_end_to_start()
+                    return True
+
+                f_new = g_new + next_cell.h_score
+                if f_new < next_cell.f_score:
+                    heap.push((f_new, k, l))
+                    next_cell.f_score = f_new
+                    next_cell.g_score = g_new
+
+            self.__animate()
 
         return False
