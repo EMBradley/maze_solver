@@ -41,6 +41,7 @@ class Window:
 
     def __init__(self, width: int, height: int) -> None:
         self.__root = Tk(className="Maze Solver")
+        self.__root.title("Maze Solver")
         self.__canvas = Canvas(height=height, width=width)
         self.__canvas.pack()
         self.__running = False
