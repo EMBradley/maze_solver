@@ -216,7 +216,7 @@ class Maze:
         accessible_neighbors = [
             (k, l)
             for (k, l, direction) in self.__get_unvisited_neighbors(i, j)
-            if not current_cell.walls[direction] and not self.cells[k][l].visited
+            if not current_cell.walls[direction]
         ]
         return accessible_neighbors
 
