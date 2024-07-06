@@ -280,7 +280,7 @@ class Maze:
                 self.__undo_path(current_cell, stack)
                 self.__animate()
 
-            for k, l in reversed(self.__get_accessible_neighbors(i, j)):
+            for k, l in reversed(accessible_neighbors):
                 neighbor = self.cells[k][l]
                 neighbor.parent = current_cell
                 stack.append((k, l))
